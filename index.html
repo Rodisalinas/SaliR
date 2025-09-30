@@ -4,28 +4,92 @@
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <title>Mafalda AR en la Plaza de Dolores</title>
-    <!-- Importar A-Frame y la librería AR.js para geolocalización -->
+    <!-- Importar A-Frame y la librería AR.js -->
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+
+    <!-- 2. ESTILOS para el panel de distancia -->
+    <style>
+      #distance-display {
+        position: absolute; /* Clave para superponerlo en la pantalla */
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10; /* Asegura que esté por encima de la vista de la cámara */
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 10px 15px;
+        border-radius: 8px;
+        font-family: Arial, sans-serif;
+        font-size: 16px;
+        text-align: center;
+        min-width: 150px;
+      }
+    </style>
   </head>
 
   <body style="margin: 0; overflow: hidden;">
+    <!-- 1. El DIV que mostrará la distancia -->
+    <div id="distance-display">Buscando ubicación...</div>
+
     <a-scene
       vr-mode-ui="enabled: false"
       arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
       renderer="antialias: true; alpha: true"
     >
-      <!-- La cámara que sigue la posición GPS del dispositivo -->
-      <a-camera gps-camera rotation-reader> </a-camera>
+      <!-- Cámara con radio de visión ampliado -->
+      <a-camera gps-camera="minDistance: 5; maxDistance: 150;" rotation-reader></a-camera>
 
-      <!-- Tu imagen de Mafalda anclada a las NUEVAS coordenadas -->
+      <!-- Imagen de Mafalda con un ID para poder encontrarla con JavaScript -->
       <a-image
-        src="https://raw.githubusercontent.com/Rodisalinas/SaliR/main/mafaldadice.png"
+        id="mafalda-target"
+        src="https://raw.githubusercontent.com/Rodisalinas/SaliR/main/mafalda-dice.png"
         look-at="[gps-camera]"
         scale="25 25 25"
-        gps-entity-place="latitude: -36.31818642426622; longitude: -57.68556705052221;"
+        gps-entity-place="latitude: -36.323991839860774; longitude: -57.68433885246008;"
       ></a-image>
-
     </a-scene>
+
+    <!-- 3. EL SCRIPT que calcula y muestra la distancia -->
+    <script>
+      // Espera a que toda la página se cargue para empezar a ejecutar el script
+      window.onload = () => {
+        const camera = document.querySelector('[gps-camera]');
+        const target = document.querySelector('#mafalda-target');
+        const display = document.querySelector('#distance-display');
+
+        // Función para calcular la distancia entre dos puntos GPS (fórmula de Haversine)
+        const calculateDistance = (lat1, lon1, lat2, lon2) => {
+          const R = 6371e3; // Radio de la Tierra en metros
+          const φ1 = lat1 * Math.PI / 180;
+          const φ2 = lat2 * Math.PI / 180;
+          const Δφ = (lat2 - lat1) * Math.PI / 180;
+          const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+          const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                    Math.cos(φ1) * Math.cos(φ2) *
+                    Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          return R * c; // Distancia en metros
+        };
+
+        // Obtenemos las coordenadas del objetivo una sola vez, ya que son fijas
+        const targetCoords = target.getAttribute('gps-entity-place');
+        const targetLat = targetCoords.latitude;
+        const targetLon = targetCoords.longitude;
+
+        // Escuchamos el evento que AR.js emite cada vez que la posición del usuario se actualiza
+        camera.addEventListener('gps-camera-update-position', event => {
+          const userLat = event.detail.position.latitude;
+          const userLon = event.detail.position.longitude;
+
+          // Calculamos la distancia
+          const distance = calculateDistance(userLat, userLon, targetLat, targetLon);
+
+          // Actualizamos el texto en el panel, redondeando a un número entero
+          display.innerHTML = `Distancia: <strong>${Math.round(distance)} metros</strong>`;
+        });
+      };
+    </script>
   </body>
 </html>
